@@ -1,0 +1,126 @@
+TITLE:: BusToOSC
+summary:: continuously send signals from buses to a NetAddr via OSC
+categories:: OSC
+related:: Classes/Bus, Classes/NetAddr
+
+DESCRIPTION::
+A convenience class for continously sending the value of a bus to a specified Open Sound Control (OSC) message. Useful for using SuperCollider Signals to control other applications that use OSC.
+
+
+CLASSMETHODS::
+
+METHOD:: new
+Creates a new instance of BusToOSC. Use one BusToOSC object for each bus you are polling.
+
+ARGUMENT:: netAddr
+pass an instance of NetAddr via this argument. This is the address you want to send the OSC message to.
+
+ARGUMENT:: bus
+pass a single channel Bus that you want to poll for the values of the OSC message
+
+ARGUMENT:: message
+a string for your OSC message. Make sure you begin the string with a "/"
+
+ARGUMENT:: update
+this is the rate at which to send OSC messages. Default is 0.04.
+
+ARGUMENT:: multiplier
+default is 1. useful for scaling SuperCollider signals to a different range of values.
+
+returns:: a Routine that polls the Bus.
+
+
+INSTANCEMETHODS::
+
+METHOD:: update
+change the rate of sending OSC messages
+
+METHOD:: netAddr
+change the NetAddr you are sending to
+
+METHOD:: bus
+change the Bus you are polling
+
+METHOD:: stop
+stop the Routine from polling
+
+METHOD:: start
+start the Routine
+
+METHOD:: multiplier
+change the multiplier of the OSC value
+
+METHOD:: message
+change the OSC message being sent
+
+EXAMPLES::
+
+code::
+//Boot the server
+s.boot;
+
+//You Need an instance of NetAddr and of Bus
+n = NetAddr("localhost", 9000); //use OSC Monitor.app
+
+//Allocate a Bus and send it a signal
+b = Bus.control(s, 1);
+y = {Out.kr(b, SinOsc.kr(0.1).range(0.01, 1))}.play;
+
+//Create an instance of BusToOSC
+x = BusToOSC.new(n, b, "/hello", 1); //This has BusToOSC poll Bus "b" once every second and send that value to NetAddr "n" with the message "/hello"
+
+x.message_("/yoh!"); //change the message
+
+x.update_(0.1); //change the update rate
+
+x.stop; //stop the polling
+
+b.free; //free the bus
+y.free//free the synth
+
+//Reccomended way of dealing with multichannel buses
+~buses = Bus.control(s, 4);
+~signal = (0..3).collect({|i| {Out.kr(~buses.subBus(i), SinOsc.kr(1.0.rand, 0.5.rand))}.play;});
+~osc = (0..3).collect({|i| BusToOSC.new(n, ~buses.subBus(i), "/dmx/universe/1/"++(i+1), 0.04, 1)});
+
+~osc.stop;
+~signal.free;
+~buses.free;
+
+//Another Example
+
+b = Bus.control(s, 1);
+
+b.scope;
+
+Ndef(\sine,
+	{
+		Out.kr(b, LFSaw.kr(0.1).range(0.1, 0.5));
+});
+
+Ndef(\pulse,
+	{
+		Out.kr(b, SinOsc.kr(0.12).range(0.1, 0.25));
+});
+
+~osc = BusToOSC.new(n, b, "/output/size", 0.1, 500);
+
+~osc.multiplier_(1);
+
+~osc.stop;
+
+Ndef(\sine).free;
+Ndef(\pulse).free;
+
+//Envelope Follower to OSC
+
+~envfol = {Out.kr(b, EnvFollow.kr(SoundIn.ar(0)))}.play;
+~osc = BusToOSC.new(n, b, "/amp", 0.04, 1);
+
+b.scope;
+
+//when done
+~osc.stop;
+~envfol.free;
+
+::
